@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
 #include <rosbag/bag.h>
-#include <tf/tfMessage.h>
+//#include <tf/tfMessage.h>
 #include <tf2_msgs/TFMessage.h>
 #include "kitti_to_rosbag/kitti_parser.h"
 #include "kitti_to_rosbag/kitti_ros_conversions.h"
@@ -175,7 +175,8 @@ bool KittiBagConverter::convertEntry(uint64_t entry) {
 
 void KittiBagConverter::convertTf(uint64_t timestamp_ns,
                                   const Transformation& imu_pose) {
-  tf::tfMessage tf_msg;
+//  tf::tfMessage tf_msg;
+  tf2_msgs::TFMessage tf2_msg;
   ros::Time timestamp_ros;
   timestampToRos(timestamp_ns, &timestamp_ros);
 
@@ -195,8 +196,10 @@ void KittiBagConverter::convertTf(uint64_t timestamp_ns,
   tf_vel_imu.header.stamp = timestamp_ros;
 
   // Put them into one tf_msg.
-  tf_msg.transforms.push_back(tf_imu_world);
-  tf_msg.transforms.push_back(tf_vel_imu);
+//  tf_msg.transforms.push_back(tf_imu_world);
+//  tf_msg.transforms.push_back(tf_vel_imu);
+  tf2_msg.transforms.push_back(tf_imu_world);
+  tf2_msg.transforms.push_back(tf_vel_imu);
 
   // Get all of the camera transformations as well.
   for (size_t cam_id = 0; cam_id < parser_.getNumCameras(); ++cam_id) {
@@ -205,10 +208,11 @@ void KittiBagConverter::convertTf(uint64_t timestamp_ns,
     tf_cam_imu.header.frame_id = imu_frame_id_;
     tf_cam_imu.child_frame_id = getCameraFrameId(cam_id);
     tf_cam_imu.header.stamp = timestamp_ros;
-    tf_msg.transforms.push_back(tf_cam_imu);
+//    tf_msg.transforms.push_back(tf_cam_imu);
+    tf2_msg.transforms.push_back(tf_cam_imu);
   }
 
-  bag_.write("/tf", timestamp_ros, tf_msg);
+  bag_.write("/tf", timestamp_ros, tf2_msg);
 }
 
 }  // namespace kitti
