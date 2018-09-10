@@ -28,10 +28,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <opencv2/highgui/highgui.hpp>
+#include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
 #include <rosbag/bag.h>
 #include <tf/tfMessage.h>
-
+#include <tf2_msgs/TFMessage.h>
 #include "kitti_to_rosbag/kitti_parser.h"
 #include "kitti_to_rosbag/kitti_ros_conversions.h"
 
@@ -39,7 +40,8 @@ namespace kitti {
 
 class KittiBagConverter {
  public:
-  KittiBagConverter(const std::string& calibration_path,
+  KittiBagConverter(ros::NodeHandle& np,
+                    const std::string& calibration_path,
                     const std::string& dataset_path,
                     const std::string& output_filename);
 
@@ -51,6 +53,7 @@ class KittiBagConverter {
   kitti::KittiParser parser_;
 
   rosbag::Bag bag_;
+  ros::NodeHandle np_;
 
   std::string world_frame_id_;
   std::string imu_frame_id_;
@@ -60,12 +63,17 @@ class KittiBagConverter {
   std::string pose_topic_;
   std::string transform_topic_;
   std::string pointcloud_topic_;
+
+  bool color_output;
+  bool point_output;
 };
 
-KittiBagConverter::KittiBagConverter(const std::string& calibration_path,
+KittiBagConverter::KittiBagConverter(ros::NodeHandle& np,
+                                     const std::string& calibration_path,
                                      const std::string& dataset_path,
                                      const std::string& output_filename)
     : parser_(calibration_path, dataset_path, true),
+      np_(np),
       world_frame_id_("world"),
       imu_frame_id_("imu"),
       cam_frame_id_prefix_("cam"),
@@ -73,6 +81,10 @@ KittiBagConverter::KittiBagConverter(const std::string& calibration_path,
       pose_topic_("pose_imu"),
       transform_topic_("transform_imu"),
       pointcloud_topic_("velodyne_points") {
+
+  np_.param<bool>("color_image", color_output, false);
+  np_.param<bool>("point_cloud", point_output, true);
+
   // Load all the timestamp maps and calibration parameters.
   parser_.loadCalibration();
   parser_.loadTimestampMaps();
@@ -117,7 +129,9 @@ bool KittiBagConverter::convertEntry(uint64_t entry) {
 
   // Convert images.
   cv::Mat image;
-  for (size_t cam_id = 0; cam_id < parser_.getNumCameras(); ++cam_id) {
+  size_t cam_num = parser_.getNumCameras();
+  cam_num = (color_output)?(cam_num):(cam_num - 2);
+  for (size_t cam_id = 0; cam_id < cam_num; ++cam_id) {
     if (parser_.getImageAtEntry(entry, cam_id, &timestamp_ns, &image)) {
       timestampToRos(timestamp_ns, &timestamp_ros);
 
@@ -141,16 +155,19 @@ bool KittiBagConverter::convertEntry(uint64_t entry) {
     }
   }
 
-  // Convert pointclouds.
-  pcl::PointCloud<pcl::PointXYZI> pointcloud;
-  if (parser_.getPointcloudAtEntry(entry, &timestamp_ns, &pointcloud)) {
-    timestampToRos(timestamp_ns, &timestamp_ros);
+  if(point_output) {
 
-    // This value is in MICROSECONDS, not nanoseconds.
-    pointcloud.header.stamp = timestamp_ns / 1000;
-    pointcloud.header.frame_id = velodyne_frame_id_;
+      // Convert pointclouds.
+      pcl::PointCloud <pcl::PointXYZI> pointcloud;
+      if (parser_.getPointcloudAtEntry(entry, &timestamp_ns, &pointcloud)) {
+          timestampToRos(timestamp_ns, &timestamp_ros);
 
-    bag_.write(pointcloud_topic_, timestamp_ros, pointcloud);
+          // This value is in MICROSECONDS, not nanoseconds.
+          pointcloud.header.stamp = timestamp_ns / 1000;
+          pointcloud.header.frame_id = velodyne_frame_id_;
+
+          bag_.write(pointcloud_topic_, timestamp_ros, pointcloud);
+      }
   }
 
   return true;
@@ -197,6 +214,9 @@ void KittiBagConverter::convertTf(uint64_t timestamp_ns,
 }  // namespace kitti
 
 int main(int argc, char** argv) {
+  ros::init(argc, argv, "cmerge_single_node");
+  ros::NodeHandle n_private("~");
+
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, false);
   google::InstallFailureSignalHandler();
@@ -212,7 +232,7 @@ int main(int argc, char** argv) {
   const std::string dataset_path = argv[2];
   const std::string output_path = argv[3];
 
-  kitti::KittiBagConverter converter(calibration_path, dataset_path,
+  kitti::KittiBagConverter converter(n_private, calibration_path, dataset_path,
                                      output_path);
   converter.convertAll();
 

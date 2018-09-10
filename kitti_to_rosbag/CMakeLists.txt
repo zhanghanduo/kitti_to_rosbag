@@ -7,6 +7,13 @@ catkin_simple(ALL_DEPS_REQUIRED)
 set(CMAKE_MACOSX_RPATH 0)
 add_definitions(-std=c++11)
 
+set(OpenCV_DIR $ENV{HOME}/softwares/opencv_3.4.1/opencv/release)
+find_package(OpenCV 3.2 REQUIRED)
+
+include_directories(
+  ${OpenCV_INCLUDE_DIRS}
+)
+
 #############
 # LIBRARIES #
 #############
@@ -32,7 +39,7 @@ target_link_libraries(kitti_rosbag_converter ${PROJECT_NAME})
 cs_add_executable(tiny_disp_view
   src/tiny_disp_view.cpp
 )
-target_link_libraries(tiny_disp_view ${PROJECT_NAME})
+target_link_libraries(tiny_disp_view ${PROJECT_NAME} ${OpenCV_LIBS})
 
 ##########
 # EXPORT #
