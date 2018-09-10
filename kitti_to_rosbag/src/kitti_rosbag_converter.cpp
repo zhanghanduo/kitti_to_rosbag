@@ -196,21 +196,18 @@ void KittiBagConverter::convertTf(uint64_t timestamp_ns,
   tf_vel_imu.header.stamp = timestamp_ros;
 
   // Put them into one tf_msg.
-//  tf_msg.transforms.push_back(tf_imu_world);
-//  tf_msg.transforms.push_back(tf_vel_imu);
   tf2_msg.transforms.push_back(tf_imu_world);
   tf2_msg.transforms.push_back(tf_vel_imu);
 
   // Get all of the camera transformations as well.
-  for (size_t cam_id = 0; cam_id < parser_.getNumCameras(); ++cam_id) {
-    T_cam_imu = parser_.T_camN_imu(cam_id);
+//  for (size_t cam_id = 0; cam_id < parser_.getNumCameras()-3; ++cam_id) {
+    T_cam_imu = parser_.T_camN_imu(0);
     transformToRos(T_cam_imu.inverse(), &tf_cam_imu);
     tf_cam_imu.header.frame_id = imu_frame_id_;
-    tf_cam_imu.child_frame_id = getCameraFrameId(cam_id);
+    tf_cam_imu.child_frame_id = getCameraFrameId(0);
     tf_cam_imu.header.stamp = timestamp_ros;
-//    tf_msg.transforms.push_back(tf_cam_imu);
     tf2_msg.transforms.push_back(tf_cam_imu);
-  }
+//  }
 
   bag_.write("/tf", timestamp_ros, tf2_msg);
 }
@@ -218,7 +215,7 @@ void KittiBagConverter::convertTf(uint64_t timestamp_ns,
 }  // namespace kitti
 
 int main(int argc, char** argv) {
-  ros::init(argc, argv, "cmerge_single_node");
+  ros::init(argc, argv, "kitti_rosbag_converter");
   ros::NodeHandle n_private("~");
 
   google::InitGoogleLogging(argv[0]);
